@@ -12,18 +12,24 @@ def merge_operators(operators):
 
 
 def simplify_expr(infix):
-    infix.insert(0, '+')
-    infix.insert(0, '0')
     new_expr = []
     redundant_operators = []
     for component in infix:
         if component in '+-':
             redundant_operators.append(component)
         else:
+            operator = ''
             if redundant_operators:
-                new_expr.append(merge_operators(redundant_operators))
+                operator = merge_operators(redundant_operators)
                 redundant_operators = []
-            new_expr.append(component)
+            if operator:
+                if not new_expr or new_expr[-1] in '*/(':
+                    new_expr.append(operator+component)
+                else:
+                    new_expr.append(operator)
+                    new_expr.append(component)
+            else:
+                new_expr.append(component)
     return new_expr
 
 
@@ -46,10 +52,12 @@ def infix_to_postfix(expression):
     postfix = []
     stack = deque()
     for component in expression:
-        if component.isalpha() or component.isnumeric() or component == '(':
+        if typeof(component) == 'variable' or typeof(component) == 'number' or component == '(':
             stack.append(component)
         elif component in '+-*/^':
-            while stack and (stack[-1].isalpha() or stack[-1].isnumeric() or compare(stack[-1], component) >= 0):
+            while stack and (typeof(stack[-1]) == 'variable'
+                             or typeof(stack[-1]) == 'number'
+                             or compare(stack[-1], component) >= 0):
                 postfix.append(stack.pop())
             stack.append(component)
         else:
@@ -63,7 +71,10 @@ def infix_to_postfix(expression):
 
 def run(command):
     if command == "/help":
-        print("Type in an expression and this program will evaluate it")
+        print("Enter an expression to calculate it")
+        print("Only support int values")
+        print("Type /exit to quit")
+        print()
         return 'continue'
     elif command == "/exit":
         print("Bye!")
@@ -74,34 +85,37 @@ def run(command):
 
 
 def get_value(variable):
-    if variable.isnumeric():
+    if typeof(variable) == 'number':
         return int(variable)
-    if not variable.isalpha():
+    if typeof(variable) != 'variable':
         return "Invalid assignment"
     return variables.get(variable, 'Unknown variable')
 
 
-def typeof(character):
-    if character.isalpha():
+def typeof(characters):
+    if characters.isalpha():
         return 'variable'
-    if character.isnumeric():
+    if characters.isnumeric() or characters[1:].isnumeric() and characters[0] in '+-':
         return 'number'
-    if character in '+-*/^()':
+    if characters in '+-*/^()':
         return 'operator'
-    return ' ' if character == ' ' else ''
+    return ' ' if characters == ' ' else ''
 
 
 def next_possible_types(current_component=None):
     if current_component is None:
         return ['variable', 'number', '(', '+', '-']
 
-    if current_component.isalpha() or current_component.isnumeric():
+    if typeof(current_component) == 'variable' or typeof(current_component) == 'number':
         return [')', '+', '-', '*', '/', '^']
 
     if current_component in '+-':
         return ['variable', 'number', '+', '-', '(']
 
-    if current_component in '*/^':
+    if current_component in '*/':
+        return ['variable', 'number', '(', '+', '-']
+    
+    if current_component == '^':
         return ['variable', 'number', '(']
 
     if current_component == '(':
@@ -178,7 +192,7 @@ def calculate(postfix):
     return int(stack[0])
 
 
-def m_eval(expression):
+def evaluate(expression):
     infix = parse(expression)
     if check_syntax(infix):
         print(calculate(infix_to_postfix(simplify_expr(infix))))
@@ -187,7 +201,7 @@ def m_eval(expression):
 def assign(dst, src):
     dst = dst.strip()
     src = src.strip()
-    if not dst.isalpha():
+    if typeof(dst) != 'variable':
         print("Invalid identifier")
         return
     value = get_value(src)
@@ -199,8 +213,9 @@ def assign(dst, src):
 
 if __name__ == '__main__':
     variables = dict()
+    print('S I M P L E C A L C U L A T O R\n')
     while True:
-        expr = input().strip()
+        expr = input('> ').strip()
 
         if len(expr) == 0:
             continue
@@ -217,4 +232,5 @@ if __name__ == '__main__':
                     break
             assign(expr[:eq_pos], expr[eq_pos + 1:])
         else:
-            m_eval(expr)
+            evaluate(expr)
+            print()
